@@ -2,10 +2,47 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Assignment 1 - Speech to Text</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Speech to Text</title>
 </head>
+
 <body>
-<h1>Assignment 1 - Speech to Text</h1>
-<p>Spring Boot application is running.</p>
+
+<main>
+    <header>
+        <h1>Speech to Text</h1>
+        <p>Record your voice and convert it into text.</p>
+    </header>
+
+    <section>
+        <h2>Recording</h2>
+
+        <p>
+            Status:
+            <span id="statusText">Ready</span>
+        </p>
+
+        <button id="startButton" type="button">
+            Start Recording
+        </button>
+
+        <button id="stopButton" type="button" disabled>
+            Stop Recording
+        </button>
+    </section>
+
+    <section>
+        <h2>Transcription</h2>
+
+        <p id="transcriptionText">
+            Your transcription will appear here.
+        </p>
+    </section>
+
+    <section>
+        <p id="errorMessage" role="alert" hidden></p>
+    </section>
+</main>
+
 </body>
 </html>
