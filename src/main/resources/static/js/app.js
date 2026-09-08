@@ -5,6 +5,8 @@ const transcriptionText = document.getElementById("transcriptionText");
 const errorMessage = document.getElementById("errorMessage");
 
 let microphoneStream = null;
+let mediaRecorder = null;
+let audioChunks = [];
 
 function setStatus(message) {
     statusText.textContent = message;
@@ -26,10 +28,18 @@ function setReadyState() {
     stopButton.disabled = true;
 }
 
+function setRecordingState() {
+    setStatus("Recording...");
+    startButton.disabled = true;
+    stopButton.disabled = false;
+}
+
 function handleMicrophoneError(error) {
     switch (error.name) {
         case "NotAllowedError":
-            showError("Microphone access was denied. Please allow microphone access and try again.");
+            showError(
+                "Microphone access was denied. Please allow microphone access and try again."
+            );
             break;
 
         case "NotFoundError":
@@ -37,7 +47,9 @@ function handleMicrophoneError(error) {
             break;
 
         case "NotReadableError":
-            showError("The microphone is currently unavailable or being used by another application.");
+            showError(
+                "The microphone is currently unavailable or being used by another application."
+            );
             break;
 
         default:
@@ -46,42 +58,82 @@ function handleMicrophoneError(error) {
     }
 }
 
-async function requestMicrophoneAccess() {
+function releaseMicrophone() {
+    if (microphoneStream) {
+        microphoneStream.getTracks().forEach(track => track.stop());
+        microphoneStream = null;
+    }
+}
+
+async function startRecording() {
     clearError();
-    setStatus("Requesting microphone access...");
-    startButton.disabled = true;
-    stopButton.disabled = true;
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         showError("Microphone recording is not supported by this browser.");
-        setReadyState();
+        return;
+    }
+
+    if (!window.MediaRecorder) {
+        showError("Audio recording is not supported by this browser.");
         return;
     }
 
     try {
+        startButton.disabled = true;
+        stopButton.disabled = true;
+        setStatus("Requesting microphone access...");
+
         microphoneStream = await navigator.mediaDevices.getUserMedia({
             audio: true
         });
 
-        setStatus("Microphone ready");
+        // Start each recording with a fresh collection so audio from an
+        // earlier recording cannot accidentally be included in the next one.
+        audioChunks = [];
 
-        transcriptionText.textContent =
-            "Microphone access granted. Recording will be implemented next.";
+        mediaRecorder = new MediaRecorder(microphoneStream);
 
-        // Release the microphone after this permission check so it is not left
-        // active before the actual recording functionality is implemented.
-        microphoneStream.getTracks().forEach(track => track.stop());
-        microphoneStream = null;
+        mediaRecorder.addEventListener("dataavailable", event => {
+            if (event.data.size > 0) {
+                audioChunks.push(event.data);
+            }
+        });
+
+        mediaRecorder.addEventListener("stop", () => {
+            // Release the device after recording so the microphone is not
+            // left active while the user is waiting or starting another recording.
+            releaseMicrophone();
+
+            transcriptionText.textContent =
+                "Recording captured. Audio verification will be implemented next.";
+
+            mediaRecorder = null;
+            setReadyState();
+        });
+
+        mediaRecorder.start();
+        setRecordingState();
 
     } catch (error) {
+        releaseMicrophone();
+        mediaRecorder = null;
         handleMicrophoneError(error);
-
-    } finally {
-        startButton.disabled = false;
-        stopButton.disabled = true;
+        setReadyState();
     }
 }
 
-startButton.addEventListener("click", requestMicrophoneAccess);
+function stopRecording() {
+    if (!mediaRecorder || mediaRecorder.state !== "recording") {
+        return;
+    }
+
+    setStatus("Processing...");
+    stopButton.disabled = true;
+
+    mediaRecorder.stop();
+}
+
+startButton.addEventListener("click", startRecording);
+stopButton.addEventListener("click", stopRecording);
 
 setReadyState();
