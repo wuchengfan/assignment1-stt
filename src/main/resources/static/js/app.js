@@ -7,6 +7,7 @@ const errorMessage = document.getElementById("errorMessage");
 let microphoneStream = null;
 let mediaRecorder = null;
 let audioChunks = [];
+let recordedAudioBlob = null;
 
 function setStatus(message) {
     statusText.textContent = message;
@@ -92,6 +93,8 @@ async function startRecording() {
         audioChunks = [];
 
         mediaRecorder = new MediaRecorder(microphoneStream);
+		
+		recordedAudioBlob = null;
 
         mediaRecorder.addEventListener("dataavailable", event => {
             if (event.data.size > 0) {
@@ -99,17 +102,33 @@ async function startRecording() {
             }
         });
 
-        mediaRecorder.addEventListener("stop", () => {
-            // Release the device after recording so the microphone is not
-            // left active while the user is waiting or starting another recording.
-            releaseMicrophone();
+		mediaRecorder.addEventListener("stop", () => {
+		    const audioType = mediaRecorder.mimeType || "audio/webm";
 
-            transcriptionText.textContent =
-                "Recording captured. Audio verification will be implemented next.";
+		    recordedAudioBlob = new Blob(audioChunks, {
+		        type: audioType
+		    });
 
-            mediaRecorder = null;
-            setReadyState();
-        });
+		    // Validate the captured data before it is sent to the backend so an
+		    // empty recording does not result in a pointless API request later.
+		    if (recordedAudioBlob.size === 0) {
+		        showError("No audio data was captured. Please try recording again.");
+		        recordedAudioBlob = null;
+		    } else {
+		        const sizeInKB = (recordedAudioBlob.size / 1024).toFixed(2);
+
+		        transcriptionText.textContent =
+		            `Recording captured successfully. Size: ${sizeInKB} KB, Type: ${recordedAudioBlob.type}`;
+		    }
+
+		    // Release the microphone between recordings so the device is not
+		    // unnecessarily held while the user is waiting.
+		    releaseMicrophone();
+
+		    audioChunks = [];
+		    mediaRecorder = null;
+		    setReadyState();
+		});
 
         mediaRecorder.start();
         setRecordingState();
