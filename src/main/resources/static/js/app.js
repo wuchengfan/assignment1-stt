@@ -66,6 +66,29 @@ function releaseMicrophone() {
     }
 }
 
+async function uploadRecordedAudio(audioBlob) {
+    const formData = new FormData();
+
+    formData.append(
+        "audio",
+        audioBlob,
+        "recording.webm"
+    );
+
+    const response = await fetch("/api/audio", {
+        method: "POST",
+        body: formData
+    });
+
+    const responseText = await response.text();
+
+    if (!response.ok) {
+        throw new Error(responseText || "Audio upload failed.");
+    }
+
+    return responseText;
+}
+
 async function startRecording() {
     clearError();
 
@@ -102,32 +125,46 @@ async function startRecording() {
             }
         });
 
-		mediaRecorder.addEventListener("stop", () => {
+		mediaRecorder.addEventListener("stop", async () => {
 		    const audioType = mediaRecorder.mimeType || "audio/webm";
 
 		    recordedAudioBlob = new Blob(audioChunks, {
 		        type: audioType
 		    });
 
-		    // Validate the captured data before it is sent to the backend so an
-		    // empty recording does not result in a pointless API request later.
+		    // Reject empty recordings before making a backend request because
+		    // sending unusable audio would only waste server and cloud resources.
 		    if (recordedAudioBlob.size === 0) {
 		        showError("No audio data was captured. Please try recording again.");
-		        recordedAudioBlob = null;
-		    } else {
-		        const sizeInKB = (recordedAudioBlob.size / 1024).toFixed(2);
 
-		        transcriptionText.textContent =
-		            `Recording captured successfully. Size: ${sizeInKB} KB, Type: ${recordedAudioBlob.type}`;
+		        recordedAudioBlob = null;
+		        releaseMicrophone();
+		        audioChunks = [];
+		        mediaRecorder = null;
+		        setReadyState();
+
+		        return;
 		    }
 
-		    // Release the microphone between recordings so the device is not
-		    // unnecessarily held while the user is waiting.
 		    releaseMicrophone();
-
 		    audioChunks = [];
 		    mediaRecorder = null;
-		    setReadyState();
+
+		    setStatus("Uploading audio...");
+
+		    try {
+		        const result = await uploadRecordedAudio(recordedAudioBlob);
+
+		        transcriptionText.textContent = result;
+
+		    } catch (error) {
+		        showError(
+		            error.message || "Unable to upload the recording. Please try again."
+		        );
+
+		    } finally {
+		        setReadyState();
+		    }
 		});
 
         mediaRecorder.start();
