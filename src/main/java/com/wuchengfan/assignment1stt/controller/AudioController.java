@@ -28,18 +28,14 @@ public class AudioController {
         }
 
         try {
-            String transcription =
-                    transcriptionService.transcribe(audio);
-
+            String transcription = transcriptionService.transcribe(audio);
             return ResponseEntity.ok(transcription);
 
         } catch (IllegalArgumentException exception) {
-
             return ResponseEntity.badRequest()
                     .body(exception.getMessage());
 
         } catch (IllegalStateException exception) {
-
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body("Transcription service is currently unavailable.");
         }

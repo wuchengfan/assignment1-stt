@@ -1,7 +1,10 @@
 package com.wuchengfan.assignment1stt.service;
 
+import java.time.Duration;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -23,10 +26,23 @@ public class TranscriptionService {
     private final RestClient restClient;
 
     public TranscriptionService(
-            @Value("${OPENAI_API_KEY:}") String apiKey) {
+            @Value("${OPENAI_API_KEY:}") String apiKey,
+            @Value("${spring.http.clients.connect-timeout:3s}")
+            Duration connectTimeout,
+            @Value("${spring.http.clients.read-timeout:8s}")
+            Duration readTimeout) {
 
         this.apiKey = apiKey;
-        this.restClient = RestClient.create();
+
+        SimpleClientHttpRequestFactory requestFactory =
+                new SimpleClientHttpRequestFactory();
+
+        requestFactory.setConnectTimeout(connectTimeout);
+        requestFactory.setReadTimeout(readTimeout);
+
+        this.restClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
     }
 
     public String transcribe(MultipartFile audio) {
