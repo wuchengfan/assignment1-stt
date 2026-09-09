@@ -24,15 +24,18 @@ public class TranscriptionService {
 
     private final String apiKey;
     private final RestClient restClient;
+    private final StatisticsService statisticsService;
 
     public TranscriptionService(
             @Value("${OPENAI_API_KEY:}") String apiKey,
             @Value("${spring.http.clients.connect-timeout:3s}")
             Duration connectTimeout,
             @Value("${spring.http.clients.read-timeout:8s}")
-            Duration readTimeout) {
+            Duration readTimeout,
+            StatisticsService statisticsService) {
 
         this.apiKey = apiKey;
+        this.statisticsService = statisticsService;
 
         SimpleClientHttpRequestFactory requestFactory =
                 new SimpleClientHttpRequestFactory();
@@ -82,6 +85,12 @@ public class TranscriptionService {
                         "The transcription service returned no text.");
             }
 
+            if (response.usage() != null) {
+                statisticsService.addUsage(
+                        response.usage().input_tokens(),
+                        response.usage().output_tokens());
+            }
+
             return response.text();
 
         } catch (RestClientResponseException exception) {
@@ -99,6 +108,19 @@ public class TranscriptionService {
         }
     }
 
-    private record TranscriptionResponse(String text) {
+    /*
+     * OpenAI transcription response fields follow the official
+     * Audio Transcriptions API documentation.
+     * Development assistance was provided by ChatGPT and reviewed
+     * for this project.
+     */
+    private record TranscriptionResponse(
+            String text,
+            Usage usage) {
+    }
+
+    private record Usage(
+            long input_tokens,
+            long output_tokens) {
     }
 }
